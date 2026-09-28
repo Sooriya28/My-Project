@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  code, kbd, samp, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom industrial scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Precision reticle and grid background */
+.bg-grid-industrial {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(51, 65, 85, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(51, 65, 85, 0.15) 1px, transparent 1px);
+}
+
+.bg-dot-matrix {
+  background-size: 16px 16px;
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+}

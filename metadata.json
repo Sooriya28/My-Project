@@ -1,0 +1,6 @@
+{
+  "name": "AutoBrake AI - Industrial Disc Brake Inspection System",
+  "description": "Modular machine vision, CNN defect classification, dimensional metrology gauging, PLC rejection control, and SPC quality reporting for automotive disc brake manufacturing.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
