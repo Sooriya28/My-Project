@@ -8,8 +8,11 @@ import {
   FileText, 
   Play, 
   Square, 
-  Layers
+  Layers,
+  UserCheck,
+  Users
 } from 'lucide-react';
+import { OperatorProfile } from '../types/inspection';
 
 interface NavigationProps {
   activeTab: 'console' | 'line' | 'metrology' | 'plc' | 'spc' | 'blueprint';
@@ -19,6 +22,8 @@ interface NavigationProps {
   onOpenReport: () => void;
   passCount: number;
   failCount: number;
+  currentOperator: OperatorProfile;
+  onOpenLogin: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -29,6 +34,8 @@ export const Navigation: React.FC<NavigationProps> = ({
   onOpenReport,
   passCount,
   failCount,
+  currentOperator,
+  onOpenLogin,
 }) => {
   return (
     <header className="border-b border-slate-800 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
@@ -64,7 +71,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             }`}
           >
             <Scan className="w-4 h-4" />
-            Inspection Console
+            Live Cell (Console + Line)
           </button>
 
           <button
@@ -130,8 +137,8 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* Zone 3: 1-2 primary actions */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Quick Counter (unboxed text metadata per zero-pill rule) */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono">
+          {/* Quick Counter */}
+          <div className="hidden xl:flex items-center gap-2 text-xs text-slate-400 font-mono">
             <span className="text-emerald-400 font-semibold">{passCount} PASS</span>
             <span aria-hidden="true" className="text-slate-600">/</span>
             <span className="text-rose-400 font-semibold">{failCount} REJECT</span>
@@ -160,10 +167,32 @@ export const Navigation: React.FC<NavigationProps> = ({
 
           <button
             onClick={onOpenReport}
-            className="px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap border border-slate-700"
+            className="px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap border border-slate-700"
+            title="Generate Detailed Full Quality Inspection Report (IATF 16949 / ISO 9001)"
           >
-            <FileText className="w-3.5 h-3.5" />
-            Shift Report
+            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Full Report</span>
+          </button>
+
+          {/* Operator Login / Switcher Profile Button */}
+          <button
+            onClick={onOpenLogin}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs transition-colors group"
+            title="Click to Switch Operator / Role or View End-User Roles"
+          >
+            <div className={`w-5 h-5 rounded-full bg-gradient-to-br ${currentOperator?.avatarColor || 'from-cyan-500 to-blue-600'} flex items-center justify-center text-[10px] font-bold text-white shadow-inner shrink-0`}>
+              {currentOperator?.id?.slice(0, 2) || 'OP'}
+            </div>
+            <div className="hidden sm:flex flex-col text-left">
+              <span className="text-[11px] font-bold text-white group-hover:text-cyan-400 flex items-center gap-1">
+                {currentOperator?.name?.split(' ')[0] || 'Operator'}
+                <span className="text-[9px] text-cyan-300 font-mono px-1 py-0.2 bg-slate-800 rounded">
+                  {currentOperator?.role === 'QA_ENGINEER' ? 'QA' : currentOperator?.role === 'ADMIN' ? 'MGR' : currentOperator?.role === 'CONTROLS_TECH' ? 'ENG' : 'OP'}
+                </span>
+              </span>
+              <span className="text-[9px] text-slate-400 font-mono">{currentOperator?.id || 'OP-05'}</span>
+            </div>
+            <UserCheck className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-400 shrink-0" />
           </button>
         </div>
 
@@ -175,7 +204,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           onClick={() => setActiveTab('console')}
           className={`px-2.5 py-1 rounded whitespace-nowrap ${activeTab === 'console' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400'}`}
         >
-          Console
+          Live Cell
         </button>
         <button
           onClick={() => setActiveTab('line')}
@@ -206,6 +235,13 @@ export const Navigation: React.FC<NavigationProps> = ({
           className={`px-2.5 py-1 rounded whitespace-nowrap ${activeTab === 'blueprint' ? 'bg-slate-800 text-cyan-400' : 'text-slate-400'}`}
         >
           18 Modules
+        </button>
+        <button
+          onClick={onOpenLogin}
+          className="px-2.5 py-1 rounded whitespace-nowrap bg-slate-900 text-cyan-400 font-mono flex items-center gap-1 border border-slate-800 ml-auto"
+        >
+          <UserCheck className="w-3 h-3" />
+          <span>{currentOperator?.id || 'Login'}</span>
         </button>
       </div>
     </header>

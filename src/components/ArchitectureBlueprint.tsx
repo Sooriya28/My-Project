@@ -14,7 +14,12 @@ import {
   ChevronRight,
   ShieldCheck,
   Zap,
-  Activity
+  Activity,
+  Users,
+  Building2,
+  Ruler,
+  FileText,
+  Award
 } from 'lucide-react';
 
 export const ArchitectureBlueprint: React.FC = () => {
@@ -221,6 +226,131 @@ export const ArchitectureBlueprint: React.FC = () => {
           <p className="text-xs text-slate-400">
             Evolutionary roadmap from notebook CNN model to turnkey small-industry machine vision cell
           </p>
+        </div>
+      </div>
+
+      {/* End-User Personas & Operational Roles Matrix (Who is the End-User?) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 gap-2">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-cyan-400" />
+              <span>Who is the End-User of This System? · Industrial Stakeholder Matrix</span>
+            </h3>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">
+              AutoBrake AI serves five distinct manufacturing, engineering, and quality roles
+            </p>
+          </div>
+          <span className="text-[10px] font-mono bg-cyan-950 text-cyan-300 border border-cyan-800 px-2 py-0.5 rounded font-bold">
+            IATF 16949 / ISO 9001 Compliance
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
+          {/* Persona 1 */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-md">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-white">1. Line Operators & Techs</h4>
+              </div>
+              <span className="text-[10px] bg-blue-950 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                Level 1: Tactical
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              <strong>Daily Workflow:</strong> Monitors the infeed conveyor, visually confirms green PASS / red REJECT status, clears jammed discs, acknowledges stack-light buzzers, and supervises pneumatic sorting bin routing.
+            </p>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-cyan-400">
+              <strong>Core Value:</strong> Zero-fatigue automated sorting at 30–60 parts/minute without manual human visual error.
+            </div>
+          </div>
+
+          {/* Persona 2 */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-md">
+                  <Ruler className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-white">2. Quality Engineers & QA</h4>
+              </div>
+              <span className="text-[10px] bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                Level 2: Metrology
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              <strong>Daily Workflow:</strong> Validates dimensional tolerances (Outer Diameter 280±0.5mm, Thickness 24±0.2mm, Runout &lt;0.05mm), monitors Cpk &gt; 1.33 process capability, fine-tunes AI confidence thresholds, and signs off on shift lots.
+            </p>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-emerald-400">
+              <strong>Core Value:</strong> Replaces slow offline coordinate measuring machine (CMM) audits with 100% inline optical metrology.
+            </div>
+          </div>
+
+          {/* Persona 3 */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-purple-500/20 text-purple-400 rounded-md">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-white">3. Plant Operations Manager</h4>
+              </div>
+              <span className="text-[10px] bg-purple-950 text-purple-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                Level 3: Operations
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              <strong>Daily Workflow:</strong> Tracks shift OEE (target &gt; 94%), scrap loss costs, defect Pareto rankings (cracks vs machining chatter vs casting blowholes), and releases compliant production batches to pack-out.
+            </p>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-purple-400">
+              <strong>Core Value:</strong> Eliminates catastrophic warranty claims and customer recall penalties by catching defects before shipping.
+            </div>
+          </div>
+
+          {/* Persona 4 */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-amber-500/20 text-amber-400 rounded-md">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-white">4. OEM Client Auditors</h4>
+              </div>
+              <span className="text-[10px] bg-amber-950 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                Level 4: Compliance
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              <strong>Daily Workflow:</strong> Tier-1 and OEM clients (e.g. Brembo, Bosch, Continental, Tesla, Toyota) inspecting the manufacturing plant. Audits serialized part records, digital signatures, and Certificates of Conformance (CoC).
+            </p>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-amber-400">
+              <strong>Core Value:</strong> 100% digital traceability down to individual rotor serial numbers with timestamped defect heatmaps.
+            </div>
+          </div>
+
+          {/* Persona 5 */}
+          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-cyan-500/20 text-cyan-400 rounded-md">
+                  <Cpu className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-white">5. Automation & PLC Controls Engineers</h4>
+              </div>
+              <span className="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                Level 5: Integration
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              <strong>Daily Workflow:</strong> Integrates the vision inference PC with factory Siemens S7-1200 / Rockwell ControlLogix PLCs over 24V DC optoisolated I/O or PROFINET. Tunes optical ring strobe pulse width (microseconds), proximity sensor debounce, and pneumatic diverter stroke delays.
+            </p>
+            <div className="p-2 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-cyan-400">
+              <strong>Core Value:</strong> Seamless plug-and-play integration into existing automotive factory conveyor cells without rewiring the plant.
+            </div>
+          </div>
         </div>
       </div>
 

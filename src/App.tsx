@@ -10,7 +10,9 @@ import {
   PlcIoState, 
   RotorSample, 
   SpcStats, 
-  SystemSettings 
+  SystemSettings,
+  OperatorProfile,
+  PRESET_OPERATORS
 } from './types/inspection';
 import { ROTOR_SAMPLES } from './data/rotorSamples';
 import { VisionProcessResult } from './utils/visionEngine';
@@ -22,6 +24,7 @@ import { PlcController } from './components/PlcController';
 import { SpcAnalytics } from './components/SpcAnalytics';
 import { ArchitectureBlueprint } from './components/ArchitectureBlueprint';
 import { ShiftReportModal } from './components/ShiftReportModal';
+import { LoginModal } from './components/LoginModal';
 
 // Initial pre-seeded historical shift records (Module 15 & 18 data)
 const INITIAL_RECORDS: InspectionRecord[] = [
@@ -195,6 +198,8 @@ export default function App() {
   const [records, setRecords] = useState<InspectionRecord[]>(INITIAL_RECORDS);
   const [isAutoRunning, setIsAutoRunning] = useState<boolean>(false);
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [currentOperator, setCurrentOperator] = useState<OperatorProfile>(PRESET_OPERATORS[0]);
 
   // System Settings
   const [settings, setSettings] = useState<SystemSettings>({
@@ -288,7 +293,7 @@ export default function App() {
       defectSeverity: sample.severity,
       confidence: result.confidence,
       cycleTimeMs: result.inferenceTimeMs,
-      operatorId: 'OP-05',
+      operatorId: currentOperator.id,
       cameraChannel: settings.activeCamera,
       defects: result.detectedDefects,
       dimensions: result.metrology,
@@ -296,7 +301,7 @@ export default function App() {
     };
 
     setRecords(prev => [newRecord, ...prev]);
-  }, [settings.activeCamera]);
+  }, [settings.activeCamera, currentOperator.id]);
 
   // Triggered by PLC logic
   const handleTriggerPlc = useCallback((decision: 'PASS' | 'FAIL') => {
@@ -333,6 +338,8 @@ export default function App() {
         onOpenReport={() => setIsReportOpen(true)}
         passCount={passCount}
         failCount={failCount}
+        currentOperator={currentOperator}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -346,6 +353,7 @@ export default function App() {
             setSettings={setSettings}
             onTriggerPlc={handleTriggerPlc}
             isAutoRunning={isAutoRunning}
+            setIsAutoRunning={setIsAutoRunning}
           />
         )}
 
@@ -408,6 +416,15 @@ export default function App() {
         onClose={() => setIsReportOpen(false)}
         spcStats={spcStats}
         records={records}
+        currentOperator={currentOperator}
+      />
+
+      {/* Industrial Login & Role Switcher Modal (Module 17: RBAC) */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        currentOperator={currentOperator}
+        onSelectOperator={setCurrentOperator}
       />
 
       {/* Industrial Footer */}

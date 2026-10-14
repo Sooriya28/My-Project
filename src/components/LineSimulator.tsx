@@ -19,6 +19,8 @@ interface LineSimulatorProps {
   onTriggerInspection: (sample: RotorSample, decision: 'PASS' | 'FAIL') => void;
   isAutoRunning: boolean;
   setIsAutoRunning: (val: boolean) => void;
+  isEmbedded?: boolean;
+  onSelectDisc?: (sample: RotorSample) => void;
 }
 
 interface SimulatedDisc {
@@ -36,6 +38,8 @@ export const LineSimulator: React.FC<LineSimulatorProps> = ({
   onTriggerInspection,
   isAutoRunning,
   setIsAutoRunning,
+  isEmbedded = false,
+  onSelectDisc,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [speedPpm, setSpeedPpm] = useState<number>(30);
@@ -444,25 +448,32 @@ export const LineSimulator: React.FC<LineSimulatorProps> = ({
   }, [discs, strobeFlash, pneumaticPusherY, speedPpm, isAutoRunning]);
 
   return (
-    <div className="space-y-6">
+    <div className={isEmbedded ? "space-y-3" : "space-y-6"}>
       
       {/* Simulator Header & Controls */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
-            <span>Automated Production Line Simulation</span>
-            <span className="text-xs text-cyan-400 font-mono">Modules 1, 2, 8, 9, 10</span>
-          </h2>
-          <p className="text-xs text-slate-400">
-            Real-time physical flow: Loading Jig → Photoelectric Sensor → Strobe Machine Vision → Pneumatic Reject Solenoid → Bin Sorter
-          </p>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <span className={`w-2.5 h-2.5 rounded-full ${isAutoRunning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+          <div>
+            <h2 className="text-sm sm:text-base font-semibold text-white tracking-tight flex items-center gap-2">
+              <span>{isEmbedded ? "Conveyor Infeed & Rejection Sorter (Modules 1 & 8)" : "Automated Production Line Simulation"}</span>
+              <span className="text-[10px] text-cyan-400 font-mono bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800">
+                {isAutoRunning ? "RUNNING" : "STOPPED"}
+              </span>
+            </h2>
+            {!isEmbedded && (
+              <p className="text-xs text-slate-400">
+                Real-time physical flow: Loading Jig → Photoelectric Sensor → Strobe Machine Vision → Pneumatic Reject Solenoid → Bin Sorter
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <button
             onClick={() => setIsAutoRunning(!isAutoRunning)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
               isAutoRunning
                 ? 'bg-amber-600 hover:bg-amber-500 text-white'
                 : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/30'
@@ -471,35 +482,35 @@ export const LineSimulator: React.FC<LineSimulatorProps> = ({
             {isAutoRunning ? (
               <>
                 <Square className="w-3.5 h-3.5 fill-current" />
-                Pause Conveyor
+                Pause Line
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5 fill-current" />
-                Start Conveyor
+                Start Line
               </>
             )}
           </button>
 
           <button
             onClick={stepForward}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <StepForward className="w-3.5 h-3.5" />
-            Step Pulse
+            Step
           </button>
 
           <button
             onClick={() => injectDisc(false)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <PlusCircle className="w-3.5 h-3.5" />
-            Feed Good Rotor
+            Feed Good
           </button>
 
           <button
             onClick={() => injectDisc(true)}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <PlusCircle className="w-3.5 h-3.5" />
             Inject Defect
@@ -507,49 +518,62 @@ export const LineSimulator: React.FC<LineSimulatorProps> = ({
 
           <button
             onClick={() => setEStopTriggered(!eStopTriggered)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
               eStopTriggered
                 ? 'bg-rose-600 text-white animate-pulse'
                 : 'bg-slate-800 hover:bg-rose-950 text-rose-400 border border-rose-800'
             }`}
           >
             <AlertOctagon className="w-3.5 h-3.5" />
-            {eStopTriggered ? 'E-STOP ACTIVE' : 'E-STOP'}
+            {eStopTriggered ? 'E-STOP' : 'E-STOP'}
           </button>
         </div>
       </div>
 
       {/* Latest Verdict Banner */}
       {lastVerdict && (
-        <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono transition-all ${
+        <div className={`p-2.5 rounded-xl border flex flex-wrap items-center justify-between text-xs font-mono transition-all gap-2 ${
           lastVerdict.decision === 'PASS' 
             ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200' 
             : 'bg-rose-950/50 border-rose-500/80 text-rose-200 animate-pulse'
         }`}>
           <div className="flex items-center gap-2">
             {lastVerdict.decision === 'PASS' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             ) : (
-              <XCircle className="w-5 h-5 text-rose-400" />
+              <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
             )}
             <span>
-              LATEST INSPECTED: <strong>{lastVerdict.serial}</strong> · CLASSIFICATION: <strong>{lastVerdict.defect}</strong>
+              CONVEYOR CAMERA TRIGGER: <strong>{lastVerdict.serial}</strong> · <strong>{lastVerdict.defect}</strong>
             </span>
           </div>
-          <div className="font-bold">
-            ACTION: {lastVerdict.decision === 'PASS' ? 'ACCEPTED (PASS BIN)' : 'EJECTED TO REJECT BIN (SOLENOID ON)'}
+          <div className="font-bold text-[11px]">
+            {lastVerdict.decision === 'PASS' ? 'ROUTE A: ACCEPTED (PASS BIN)' : 'ROUTE B: PNEUMATIC SOLENOID EJECT'}
           </div>
         </div>
       )}
 
       {/* Primary Animated Canvas Viewport */}
-      <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-hidden shadow-2xl space-y-4">
-        <div className="relative w-full aspect-[16/7] min-h-[320px] bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80">
+      <div className={`bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-2xl ${isEmbedded ? 'p-2.5 space-y-2.5' : 'p-4 space-y-4'}`}>
+        <div className={`relative w-full bg-slate-950 rounded-lg overflow-hidden border border-slate-800/80 ${
+          isEmbedded ? 'aspect-[16/4.5] min-h-[190px] max-h-[250px]' : 'aspect-[16/7] min-h-[320px]'
+        }`}>
           <canvas
             ref={canvasRef}
             width={1000}
             height={440}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain cursor-crosshair"
+            onClick={(e) => {
+              if (!onSelectDisc) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const clickXNorm = (e.clientX - rect.left) / rect.width;
+              const targetX = clickXNorm * 1000;
+              // Find closest disc
+              const clickedDisc = discs.find(d => Math.abs(d.x - targetX) < 60);
+              if (clickedDisc) {
+                onSelectDisc(clickedDisc.sample);
+              }
+            }}
           />
 
           {eStopTriggered && (

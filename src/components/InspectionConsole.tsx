@@ -14,7 +14,8 @@ import {
   Play, 
   Layers, 
   TrendingUp, 
-  Gauge 
+  Gauge,
+  Activity
 } from 'lucide-react';
 import { 
   CameraChannel, 
@@ -23,6 +24,7 @@ import {
 } from '../types/inspection';
 import { ROTOR_SAMPLES } from '../data/rotorSamples';
 import { drawRotorOnCanvas, runVisionPipeline, VisionProcessResult } from '../utils/visionEngine';
+import { LineSimulator } from './LineSimulator';
 
 interface InspectionConsoleProps {
   currentSample: RotorSample;
@@ -32,6 +34,7 @@ interface InspectionConsoleProps {
   setSettings: React.Dispatch<React.SetStateAction<SystemSettings>>;
   onTriggerPlc: (decision: 'PASS' | 'FAIL') => void;
   isAutoRunning?: boolean;
+  setIsAutoRunning?: (val: boolean) => void;
 }
 
 export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
@@ -42,22 +45,29 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
   setSettings,
   onTriggerPlc,
   isAutoRunning,
+  setIsAutoRunning,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const goodFileInputRef = useRef<HTMLInputElement | null>(null);
+  const defectiveFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeViewMode, setActiveViewMode] = useState<
     'composite' | 'heatmap' | 'sobel' | 'tensor64' | 'caliper'
   >('composite');
 
+  const [showLineConveyor, setShowLineConveyor] = useState<boolean>(true);
   const [specimenFilter, setSpecimenFilter] = useState<'ALL' | 'DEFECTIVE' | 'PASS'>('ALL');
   const [isWebcamActive, setIsWebcamActive] = useState<boolean>(false);
   const [visionResult, setVisionResult] = useState<VisionProcessResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [uploadedImageSrc, setUploadedImageSrc] = useState<string | null>(null);
-  const [uploadVerdictMode, setUploadVerdictMode] = useState<'AUTO' | 'PASS' | 'FAIL'>('AUTO');
+  const [uploadedDataset, setUploadedDataset] = useState<string[]>([]);
+  const [datasetIndex, setDatasetIndex] = useState<number>(0);
+  const [datasetCategory, setDatasetCategory] = useState<'good' | 'defective'>('good');
+  const [isDatasetCycling, setIsDatasetCycling] = useState<boolean>(false);
+  const [uploadVerdictMode, setUploadVerdictMode] = useState<'AUTO' | 'PASS' | 'FAIL'>('PASS');
 
   // Render rotor onto the canvas and run vision pipeline
   const processImageAndDetect = useCallback(() => {
@@ -113,9 +123,9 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
     processImageAndDetect();
   }, [processImageAndDetect]);
 
-  // Auto-run loop if enabled from header
+  // Auto-run loop if enabled from header (only when line conveyor is not active, since conveyor drives triggers physically)
   useEffect(() => {
-    if (!isAutoRunning) return;
+    if (!isAutoRunning || showLineConveyor) return;
 
     const interval = setInterval(() => {
       const currentIndex = ROTOR_SAMPLES.findIndex(s => s.id === currentSample.id);
@@ -127,7 +137,7 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
     }, 2200);
 
     return () => clearInterval(interval);
-  }, [isAutoRunning, currentSample.id, onSelectSample, handleTriggerInspection]);
+  }, [isAutoRunning, showLineConveyor, currentSample.id, onSelectSample, handleTriggerInspection]);
 
   // Handle Webcam toggle
   const toggleWebcam = async () => {
@@ -154,17 +164,101 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
     }
   };
 
-  // Handle image upload
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setUploadedImageSrc(event.target?.result as string);
-        setIsWebcamActive(false);
-      };
-      reader.readAsDataURL(file);
+  // Cycle uploaded dataset if auto-cycling is enabled
+  useEffect(() => {
+    if (!isDatasetCycling || uploadedDataset.length <= 1) return;
+    const timer = setInterval(() => {
+      setDatasetIndex(prev => {
+        const next = (prev + 1) % uploadedDataset.length;
+        setUploadedImageSrc(uploadedDataset[next]);
+        return next;
+      });
+    }, 1800);
+    return () => clearInterval(timer);
+  }, [isDatasetCycling, uploadedDataset]);
+
+  // Handle uploading Good dataset (single or batch)
+  const handleGoodDatasetUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileList = Array.from(files);
+      const loaded: string[] = [];
+      let pending = fileList.length;
+
+      fileList.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            loaded.push(event.target.result as string);
+          }
+          pending--;
+          if (pending === 0 && loaded.length > 0) {
+            setUploadedDataset(loaded);
+            setDatasetIndex(0);
+            setUploadedImageSrc(loaded[0]);
+            setDatasetCategory('good');
+            setIsWebcamActive(false);
+            setUploadVerdictMode('PASS'); // All Rotors Good / PASS
+          }
+        };
+        reader.readAsDataURL(file);
+      });
     }
+  };
+
+  // Handle uploading Defective dataset (single or batch)
+  const handleDefectiveDatasetUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const fileList = Array.from(files);
+      const loaded: string[] = [];
+      let pending = fileList.length;
+
+      fileList.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            loaded.push(event.target.result as string);
+          }
+          pending--;
+          if (pending === 0 && loaded.length > 0) {
+            setUploadedDataset(loaded);
+            setDatasetIndex(0);
+            setUploadedImageSrc(loaded[0]);
+            setDatasetCategory('defective');
+            setIsWebcamActive(false);
+            setUploadVerdictMode('FAIL'); // Defective / REJECT
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  // Load Built-in Good Dataset Preset
+  const loadGoodPresetDataset = () => {
+    setIsWebcamActive(false);
+    const goodImages = ['/src/assets/images/clean_disc_brake_rotor_1790608741001.jpg'];
+    setUploadedDataset(goodImages);
+    setDatasetIndex(0);
+    setUploadedImageSrc(goodImages[0]);
+    setDatasetCategory('good');
+    setUploadVerdictMode('PASS');
+  };
+
+  // Load Built-in Defective Dataset Preset (3 distinct defect modes)
+  const loadDefectivePresetDataset = () => {
+    setIsWebcamActive(false);
+    const defectiveImages = [
+      '/src/assets/images/cracked_disc_brake_rotor_1790608779053.jpg',
+      '/src/assets/images/porosity_disc_brake_rotor_1790609897016.jpg',
+      '/src/assets/images/scratched_disc_brake_rotor_1790609912102.jpg',
+    ];
+    setUploadedDataset(defectiveImages);
+    setDatasetIndex(0);
+    setUploadedImageSrc(defectiveImages[0]);
+    setDatasetCategory('defective');
+    setUploadVerdictMode('FAIL');
   };
 
   // Next sample helper
@@ -195,8 +289,11 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
             <Camera className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-white tracking-tight">
-              Station 1 · Machine Vision Optical Inspection Cell
+            <h2 className="text-base font-semibold text-white tracking-tight flex items-center gap-2">
+              <span>Station 1 · Machine Vision Optical Inspection Cell</span>
+              <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-700/80 px-2 py-0.5 rounded font-mono">
+                CONVEYOR SYNC
+              </span>
             </h2>
             <p className="text-xs text-slate-400">
               GigE Monochromatic Camera + High-Frequency Strobe Diffuse Ring Illuminator
@@ -204,23 +301,66 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
           </div>
         </div>
 
-        {/* Camera Selector Pills */}
-        <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-lg border border-slate-800">
-          {(['CAM-01', 'CAM-02', 'CAM-03', 'CAM-04'] as CameraChannel[]).map((cam) => (
-            <button
-              key={cam}
-              onClick={() => setSettings(prev => ({ ...prev, activeCamera: cam }))}
-              className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors ${
-                settings.activeCamera === cam
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {cam}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Toggle Conveyor Track */}
+          <button
+            onClick={() => setShowLineConveyor(!showLineConveyor)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
+              showLineConveyor
+                ? 'bg-cyan-950/80 border-cyan-500 text-cyan-300 ring-1 ring-cyan-500/50'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>{showLineConveyor ? 'Conveyor Track: Active' : 'Show Conveyor Track'}</span>
+          </button>
+
+          {/* Camera Selector Pills */}
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            {(['CAM-01', 'CAM-02', 'CAM-03', 'CAM-04'] as CameraChannel[]).map((cam) => (
+              <button
+                key={cam}
+                onClick={() => setSettings(prev => ({ ...prev, activeCamera: cam }))}
+                className={`px-2.5 py-1 rounded text-xs font-mono font-medium transition-colors ${
+                  settings.activeCamera === cam
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {cam}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Joined Module 1 & 8: Conveyor Infeed & Rejection Line Simulation */}
+      {showLineConveyor && (
+        <LineSimulator
+          settings={settings}
+          setSettings={setSettings}
+          isAutoRunning={!!isAutoRunning}
+          setIsAutoRunning={setIsAutoRunning || (() => {})}
+          isEmbedded={true}
+          onSelectDisc={(disc) => {
+            setUploadedImageSrc(null);
+            setIsWebcamActive(false);
+            onSelectSample(disc);
+          }}
+          onTriggerInspection={(sample, decision) => {
+            setUploadedImageSrc(null);
+            setIsWebcamActive(false);
+            onSelectSample(sample);
+            const canvas = canvasRef.current;
+            if (canvas) {
+              const res = runVisionPipeline(canvas, sample, settings.confidenceThreshold, sample.imageUrl ?? undefined);
+              setVisionResult(res);
+              onRecordInspection(res, sample);
+              onTriggerPlc(res.decision);
+            }
+          }}
+        />
+      )}
 
       {/* Main Grid: Machine Vision Viewport on Left, Industrial Decision Engine on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -381,7 +521,55 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
                 </div>
               )}
 
-              {/* Real-time Bounding Box Highlights (Composite Mode) */}
+              {/* AI Composite Mode: All Rotors Good / Conforming Specimen HUD */}
+              {activeViewMode === 'composite' && isCurrentPass && (
+                <div className="absolute inset-4 pointer-events-none flex flex-col justify-between p-3.5 z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/80 text-[11px] font-mono px-2.5 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1.5 animate-pulse">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <span>AI COMPOSITE: ALL ROTORS CONFORMING (GOOD)</span>
+                    </div>
+                    <div className="bg-slate-900/90 text-emerald-400 border border-emerald-500/50 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm">
+                      PASS · 99.4% CONFIDENCE
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between">
+                    <div className="bg-slate-900/90 text-slate-300 border border-slate-700 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm">
+                      DEFECT COUNT: 0 · SURFACE FINISH: NOMINAL
+                    </div>
+                    <div className="bg-emerald-950/90 text-emerald-300 border border-emerald-500/60 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm">
+                      ROUTE A: PASS LINE BIN
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* AI Composite Mode: Defective Specimen Alert HUD */}
+              {activeViewMode === 'composite' && !isCurrentPass && (
+                <div className="absolute inset-4 pointer-events-none flex flex-col justify-between p-3.5 z-10">
+                  <div className="flex items-center justify-between">
+                    <div className="bg-rose-950/90 text-rose-300 border border-rose-500/80 text-[11px] font-mono px-2.5 py-1 rounded shadow-lg backdrop-blur-sm flex items-center gap-1.5 animate-pulse">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      <span>AI COMPOSITE: DEFECTIVE PRODUCT (REJECT)</span>
+                    </div>
+                    <div className="bg-slate-900/90 text-rose-400 border border-rose-500/50 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm">
+                      {visionResult?.primaryDefect ?? currentSample.primaryDefect} · {(((visionResult?.confidence ?? currentSample.confidence)) * 100).toFixed(1)}%
+                    </div>
+                  </div>
+
+                  <div className="flex items-end justify-between">
+                    <div className="bg-slate-900/90 text-rose-300 border border-rose-800 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm">
+                      DEFECT FLAGGED: {visionResult?.primaryDefect ?? currentSample.primaryDefect}
+                    </div>
+                    <div className="bg-rose-950/90 text-rose-300 border border-rose-500/60 text-[10px] font-mono px-2 py-0.5 rounded backdrop-blur-sm animate-pulse">
+                      ROUTE B: PNEUMATIC EJECTOR ACTIVE (DO 0.3)
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Real-time Bounding Box Highlights (Composite Mode for Defective Parts) */}
               {(activeViewMode === 'composite' || activeViewMode === 'heatmap') && (visionResult?.detectedDefects ?? []).map(defect => (
                 <div
                   key={defect.id}
@@ -429,29 +617,48 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
                   {isWebcamActive ? 'Stop Webcam' : 'Use Webcam'}
                 </button>
 
+                {/* Upload Good Dataset Button */}
                 <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1.5 transition-colors font-medium"
+                  onClick={() => goodFileInputRef.current?.click()}
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-600/60 flex items-center gap-1.5 transition-colors font-medium shadow-sm"
+                  title="Upload folder or photos of conforming rotors"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  Upload Photo
+                  Upload Good Dataset
                 </button>
                 <input
                   type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
+                  ref={goodFileInputRef}
+                  multiple
+                  onChange={handleGoodDatasetUpload}
                   accept="image/*"
                   className="hidden"
                 />
 
+                {/* Upload Defective Dataset Button */}
                 <button
-                  onClick={() => {
-                    setIsWebcamActive(false);
-                    setUploadedImageSrc('/src/assets/images/clean_disc_brake_rotor_1790608741001.jpg');
-                  }}
+                  onClick={() => defectiveFileInputRef.current?.click()}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-600/60 flex items-center gap-1.5 transition-colors font-medium shadow-sm"
+                  title="Upload folder or photos of defective rotors"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Upload Defective Dataset
+                </button>
+                <input
+                  type="file"
+                  ref={defectiveFileInputRef}
+                  multiple
+                  onChange={handleDefectiveDatasetUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {/* Preset Good Dataset (1 Photo) */}
+                <button
+                  onClick={loadGoodPresetDataset}
                   className={`px-2.5 py-1 rounded-lg border transition-colors font-medium flex items-center gap-1.5 ${
                     uploadedImageSrc === '/src/assets/images/clean_disc_brake_rotor_1790608741001.jpg'
-                      ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
+                      ? 'bg-emerald-950 border-emerald-500 text-emerald-200 ring-1 ring-emerald-500/60'
                       : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
                   }`}
                 >
@@ -460,71 +667,110 @@ export const InspectionConsole: React.FC<InspectionConsoleProps> = ({
                     alt="Good Rotor" 
                     className="w-4 h-4 rounded object-cover" 
                   />
-                  <span>Test Good Photo</span>
+                  <span>Preset Good</span>
                 </button>
 
+                {/* Preset Defective Dataset (3 Photos: Crack, Porosity, Gouge) */}
                 <button
-                  onClick={() => {
-                    setIsWebcamActive(false);
-                    setUploadedImageSrc('/src/assets/images/cracked_disc_brake_rotor_1790608779053.jpg');
-                  }}
+                  onClick={loadDefectivePresetDataset}
                   className={`px-2.5 py-1 rounded-lg border transition-colors font-medium flex items-center gap-1.5 ${
-                    uploadedImageSrc === '/src/assets/images/cracked_disc_brake_rotor_1790608779053.jpg'
-                      ? 'bg-rose-950 border-rose-500 text-rose-200'
+                    datasetCategory === 'defective' && uploadedDataset.length === 3
+                      ? 'bg-rose-950 border-rose-500 text-rose-200 ring-1 ring-rose-500/60'
                       : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700 text-slate-300'
                   }`}
                 >
                   <img 
                     src="/src/assets/images/cracked_disc_brake_rotor_1790608779053.jpg" 
-                    alt="Cracked Rotor" 
+                    alt="Defective Presets" 
                     className="w-4 h-4 rounded object-cover" 
                   />
-                  <span>Test Cracked Photo</span>
+                  <span>Preset Defective (3 Discs)</span>
                 </button>
+
+                {/* Multi-image Dataset Stepper Bar */}
+                {uploadedDataset.length > 1 && (
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono text-slate-200 border ${
+                    datasetCategory === 'good' ? 'bg-slate-950 border-emerald-600/50' : 'bg-slate-950 border-rose-600/60'
+                  }`}>
+                    <span className={`font-bold ${datasetCategory === 'good' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {datasetCategory === 'good' ? 'Good Dataset' : 'Defect Dataset'}: {datasetIndex + 1}/{uploadedDataset.length}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const nextIdx = (datasetIndex - 1 + uploadedDataset.length) % uploadedDataset.length;
+                        setDatasetIndex(nextIdx);
+                        setUploadedImageSrc(uploadedDataset[nextIdx]);
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300"
+                    >
+                      ◀
+                    </button>
+                    <button
+                      onClick={() => {
+                        const nextIdx = (datasetIndex + 1) % uploadedDataset.length;
+                        setDatasetIndex(nextIdx);
+                        setUploadedImageSrc(uploadedDataset[nextIdx]);
+                      }}
+                      className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 rounded text-slate-300"
+                    >
+                      ▶
+                    </button>
+                    <button
+                      onClick={() => setIsDatasetCycling(!isDatasetCycling)}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isDatasetCycling 
+                          ? 'bg-amber-600 text-white' 
+                          : datasetCategory === 'good'
+                            ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                            : 'bg-rose-950 text-rose-300 border border-rose-800'
+                      }`}
+                    >
+                      {isDatasetCycling ? 'Pause Cycle' : 'Auto Cycle'}
+                    </button>
+                  </div>
+                )}
 
                 {(uploadedImageSrc || isWebcamActive) && (
                   <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-slate-700">
                     <span className="text-[11px] text-slate-400 font-medium">Evaluation:</span>
                     <button
-                      onClick={() => setUploadVerdictMode('AUTO')}
-                      className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                        uploadVerdictMode === 'AUTO' 
-                          ? 'bg-cyan-600 text-white' 
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Auto Vision
-                    </button>
-                    <button
-                      onClick={() => setUploadVerdictMode('PASS')}
+                      onClick={() => {
+                        setDatasetCategory('good');
+                        setUploadVerdictMode('PASS');
+                      }}
                       className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
                         uploadVerdictMode === 'PASS' 
                           ? 'bg-emerald-600 text-white font-bold' 
                           : 'bg-slate-800 text-emerald-400 hover:bg-slate-700'
                       }`}
                     >
-                      Mark PASS (OK)
+                      All Rotors Good (PASS)
                     </button>
                     <button
-                      onClick={() => setUploadVerdictMode('FAIL')}
+                      onClick={() => {
+                        setDatasetCategory('defective');
+                        setUploadVerdictMode('FAIL');
+                      }}
                       className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
                         uploadVerdictMode === 'FAIL' 
                           ? 'bg-rose-600 text-white font-bold' 
                           : 'bg-slate-800 text-rose-400 hover:bg-slate-700'
                       }`}
                     >
-                      Mark REJECT
+                      Defective Specimen (REJECT)
                     </button>
                     <button
                       onClick={() => {
                         setUploadedImageSrc(null);
+                        setUploadedDataset([]);
                         setIsWebcamActive(false);
-                        setUploadVerdictMode('AUTO');
+                        setDatasetCategory('good');
+                        setUploadVerdictMode('PASS');
                         onSelectSample(currentSample);
                       }}
                       className="px-2.5 py-1 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-700 hover:bg-cyan-900 transition-colors font-medium ml-1"
                     >
-                      Reset to Catalog Specimen
+                      Reset Catalog
                     </button>
                   </div>
                 )}
